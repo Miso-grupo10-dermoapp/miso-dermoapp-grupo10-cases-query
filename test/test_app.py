@@ -52,34 +52,15 @@ def load_table(data_table):
         'shape': 'shape-test',
         'number_of_lessions': 'lesson_test',
         'distributions': 'test',
-        'color': 'test-red'
+        'color': 'test-red',
+        'patient_id': '123'
     }
     table.put_item(Item=body)
-def test_givenValidInputRequestThenReturn200AndValidPersistence(lambda_environment, load_table):
+def test_givenValidInputRequestThenReturn200AndValidArray(lambda_environment, load_table):
     event = {
         "resource": "/patient/{patient_id}/case/{case_id}",
         "path": "/patient/123/case/123",
         "httpMethod": "GET",
-        "pathParameters": {
-            "patient_id": "123",
-            "case_id": "123"
-        },
-        "isBase64Encoded": False
-    }
-    lambdaResponse = app.handler(event, [])
-
-    assert lambdaResponse['statusCode'] == 200
-    data = json.loads(lambdaResponse['body'])
-    assert data is not None
-    for property in body_properties:
-        assert data[property] is not None
-
-
-def test_givenMissingBodyOnRequestThenReturnError500(lambda_environment, data_table):
-    event = {
-        "resource": "/patient/{patient_id}/profile",
-        "path": "/patient/123/profile",
-        "httpMethod": "POST",
         "pathParameters": {
             "patient_id": "123"
         },
@@ -87,22 +68,55 @@ def test_givenMissingBodyOnRequestThenReturnError500(lambda_environment, data_ta
     }
     lambdaResponse = app.handler(event, [])
 
-    assert lambdaResponse['statusCode'] == 412
-    assert '{"message": "missing or malformed request body"}' in lambdaResponse['body']
+    assert lambdaResponse['statusCode'] == 200
+    data = json.loads(lambdaResponse['body'])
+    assert len(data) == 1
+    for item in data:
+        assert item['patient_id'] == '123'
 
-
-def test_givenRequestWithoutPatientIDThenReturnError412(lambda_environment, data_table):
+def test_givenValidInputRequestThenReturn200AndEmptyArray(lambda_environment, load_table):
     event = {
-        "resource": "/patient/{patient_id}/profile",
-        "path": "/patient/profile",
-        "httpMethod": "POST",
+        "resource": "/patient/{patient_id}/case/{case_id}",
+        "path": "/patient/123/case/123",
+        "httpMethod": "GET",
+        "pathParameters": {
+            "patient_id": "1234"
+        },
+        "isBase64Encoded": False
+    }
+    lambdaResponse = app.handler(event, [])
+
+    assert lambdaResponse['statusCode'] == 200
+    data = json.loads(lambdaResponse['body'])
+    assert len(data) == 0
+
+
+def test_givenMissingQueryParamsOnRequestThenReturnError412(lambda_environment, data_table):
+    event = {
+        "resource": "/patient/{patient_id}/case/{case_id}",
+        "path": "/patient/123/case/123",
+        "httpMethod": "GET",
         "pathParameters": {
         },
-        "body": "{\n \"other_field\": \"prof-1\", \"tone_skin\": \"brown\", \"eye_color\": \"blue\",\"hair_coloring\": "
-                "\"honey\", \"tan_effect\": \"test\", \"sun_tolerance\": \"low\" \n}",
         "isBase64Encoded": False
     }
     lambdaResponse = app.handler(event, [])
 
     assert lambdaResponse['statusCode'] == 412
-    assert lambdaResponse['body'] == '{"message": "missing or malformed request body"}'
+    assert '{"message": "missing or malformed query params"}' in lambdaResponse['body']
+
+
+def test_givenRequestWithErrorInDBThenReturnError500(lambda_environment):
+    event = {
+        "resource": "/patient/{patient_id}/case/{case_id}",
+        "path": "/patient/123/case/123",
+        "httpMethod": "GET",
+        "pathParameters": {
+            "patient_id": "1234"
+        },
+        "isBase64Encoded": False
+    }
+    lambdaResponse = app.handler(event, [])
+
+    assert lambdaResponse['statusCode'] == 500
+    assert "cannot proceed with the request error:"in  lambdaResponse['body']
